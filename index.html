@@ -273,7 +273,7 @@
         };
         let currentSkin = 'default';
         const playerImage = new Image();
-        playerImage.src = skins[currentSkin].src;
+        playerImage.src = skins[currentSkin].src || '';
 
         // Текстуры
         const platformTexture = new Image();
@@ -327,7 +327,7 @@
             currentSkin = localStorage.getItem('cosmoSkin') || 'default';
             const unlockedSkins = JSON.parse(localStorage.getItem('cosmoUnlockedSkins')) || ['default'];
             unlockedSkins.forEach(skin => skins[skin].unlocked = true);
-            playerImage.src = skins[currentSkin].src;
+            playerImage.src = skins[currentSkin].src || '';
             updateDisplay();
         }
 
@@ -521,7 +521,7 @@
             if (!skins[skin].unlocked) {
                 skins[skin].unlocked = true;
                 currentSkin = skin;
-                playerImage.src = skins[skin].src;
+                playerImage.src = skins[skin].src || '';
                 updateDisplay();
                 saveProgress();
                 alert(`Скин ${skin} разблокирован! Комната: ${skins[skin].room}`);
@@ -533,7 +533,7 @@
         function selectSkin(skin) {
             if (skins[skin].unlocked) {
                 currentSkin = skin;
-                playerImage.src = skins[skin].src;
+                playerImage.src = skins[skin].src || '';
                 updateDisplay();
                 saveProgress();
                 alert(`Выбран скин ${skin}. Комната: ${skins[skin].room}`);
@@ -546,7 +546,7 @@
                 const skinDiv = document.createElement('div');
                 skinDiv.className = `skin-item ${skins[skin].unlocked ? '' : 'locked'}`;
                 skinDiv.innerHTML = `
-                    <img src="${skins[skin].src}" width="50" height="50" alt="${skin}">
+                    <img src="${skins[skin].src || ''}" width="50" height="50" alt="${skin}">
                     <p>${skin} (${skins[skin].room})</p>
                     ${skins[skin].unlocked ? '<span>Выбрать</span>' : '<span>Заблокировано</span>'}
                 `;
@@ -571,7 +571,6 @@
         function closeShop() {
             shopDiv.classList.remove('open');
             shopDiv.classList.add('closed');
-        Ascending();
         }
 
         function closeQuests() {
@@ -740,13 +739,35 @@
             }
 
             // Отрисовка
-            ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height) || ctx.fillRect(0, 0, canvas.width, canvas.height, '#0f3460');
-            platforms.forEach(p => ctx.drawImage(platformTexture, p.x, p.y, p.width, p.height) || ctx.fillRect(p.x, p.y, p.width, p.height, '#533483'));
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Очищаем холст перед отрисовкой
+            if (backgroundImage.complete && backgroundImage.naturalWidth) {
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#0f3460';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            platforms.forEach(p => {
+                if (platformTexture.complete && platformTexture.naturalWidth) {
+                    ctx.drawImage(platformTexture, p.x, p.y, p.width, p.height);
+                } else {
+                    ctx.fillStyle = '#533483';
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+                }
+            });
             ctx.fillStyle = '#e94560';
-            collectibles.forEach(c => { ctx.beginPath(); ctx.arc(c.x + c.size / 2, c.y + c.size / 2, c.size / 2, 0, Math.PI * 2); ctx.fill(); });
+            collectibles.forEach(c => {
+                ctx.beginPath();
+                ctx.arc(c.x + c.size / 2, c.y + c.size / 2, c.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
             ctx.fillStyle = '#aaaaaa';
-            meteors.forEach(m => { ctx.fillRect(m.x, m.y, m.size, m.size); });
-            ctx.drawImage(playerImage, player.x, player.y, player.width, player.height) || ctx.fillRect(player.x, player.y, player.width, player.height, '#fff');
+            meteors.forEach(m => ctx.fillRect(m.x, m.y, m.size, m.size));
+            if (playerImage.complete && playerImage.naturalWidth) {
+                ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+            } else {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(player.x, player.y, player.width, player.height);
+            }
 
             requestAnimationFrame(update);
         }
@@ -793,10 +814,22 @@
             }
         }, 300000);
 
+        // Обработка ошибок загрузки ресурсов
+        playerImage.onerror = () => console.error('Failed to load player image:', playerImage.src);
+        backgroundImage.onerror = () => console.error('Failed to load background image:', backgroundImage.src);
+        platformTexture.onerror = () => console.error('Failed to load platform texture:', platformTexture.src);
+        backgroundTracks.forEach((track, index) => {
+            track.onerror = () => console.error(`Failed to load audio track ${index + 1}:`, track.src);
+        });
+
         // Старт игры
-        playerImage.onload = startGameLoop;
-        playerImage.onerror = () => { console.error('Player image failed to load'); startGameLoop(); };
-        startGameLoop();
+        function startGame() {
+            loadProgress();
+            initLevel(currentLevel);
+            startGameLoop();
+        }
+
+        startGame();
     </script>
 </body>
 </html>
